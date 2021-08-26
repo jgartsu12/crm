@@ -34,9 +34,10 @@ class AgentCreateView(OrganisorAndLoginRequiredMixin, generic.CreateView):
             user=user,
             organisation=self.request.user.userprofile
         )
+        # need to configure email
         send_mail(
             subject="You are invited to be an agent",
-            message="You were added as an agent on DJCRM. Please come login to start working.",
+            message="You were added as an agent on ctm. Please come login to start working.",
             from_email="admin@test.com",
             recipient_list=[user.email]
         )
