@@ -4,7 +4,7 @@ from django import contrib
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.http.response import JsonResponse
-from django.shortcuts import render, redirect, reverse 
+from django.shortcuts import render, redirect, reverse
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse
 from django.views import generic
@@ -20,96 +20,96 @@ from .forms import (
     FollowUpModelForm
 )
 
-logger = logging.get_logger(__name__)
-# Create your views here.
 
-# crud and list views
+logger = logging.getLogger(__name__)
 
-# registration to sign up in crm
+
+# CRUD+L - Create, Retrieve, Update and Delete + List
+
+
 class SignupView(generic.CreateView):
-    template_name = 'registration/signup.html'
+    template_name = "registration/signup.html"
     form_class = CustomUserCreationForm
 
     def get_success_url(self):
-        return reverse('login')
+        return reverse("login")
 
-# landingpage
+
 class LandingPageView(generic.TemplateView):
-    template_name = 'landingpage.html'
-    
+    template_name = "landing.html"
+
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return redirect('dashboard')
+            return redirect("dashboard")
         return super().dispatch(request, *args, **kwargs)
-    
 
-# dashboard page
+
 class DashboardView(OrganisorAndLoginRequiredMixin, generic.TemplateView):
-    template_name = 'dash.html'
+    template_name = "dashboard.html"
 
     def get_context_data(self, **kwargs):
         context = super(DashboardView, self).get_context_data(**kwargs)
 
         user = self.request.user
 
-        # get lead total
-        total_lead_count = Lead.objects.filter(organization=user.userprofile).count()
-        
-        # leads in the last 30 days
-        thirty_days_prior = datetime.date.today() - datetime.timedelta(days=30)
+        # How many leads we have in total
+        total_lead_count = Lead.objects.filter(organisation=user.userprofile).count()
 
-        total_in_last30 = Lead.objects.filter(
-            organization=user.userprofile,
-            date_added__gte=thirty_days_prior
+        # How many new leads in the last 30 days
+        thirty_days_ago = datetime.date.today() - datetime.timedelta(days=30)
+
+        total_in_past30 = Lead.objects.filter(
+            organisation=user.userprofile,
+            date_added__gte=thirty_days_ago
         ).count()
 
-        # lead conversions in last 30 days
+        # How many converted leads in the last 30 days
         converted_category = Category.objects.get(name="Converted")
-        converted_in_last30 = Lead.objects.filter(
-            organization=user.userprofile,
+        converted_in_past30 = Lead.objects.filter(
+            organisation=user.userprofile,
             category=converted_category,
             converted_date__gte=thirty_days_ago
         ).count()
 
         context.update({
-            'total_lead_count': total_lead_count,
-            'total_in_last30': total_in_last30,
-            'converted_in_last30':converted_in_last30
+            "total_lead_count": total_lead_count,
+            "total_in_past30": total_in_past30,
+            "converted_in_past30": converted_in_past30
         })
-        return context 
+        return context
 
-    
-def land_page(request):
-    return render(request, 'landing.html')
+
+def landing_page(request):
+    return render(request, "landing.html")
+
 
 class LeadListView(LoginRequiredMixin, generic.ListView):
-    template_name = 'leads/lead_list.html'
-    context_object_name = 'leads'
+    template_name = "leads/lead_list.html"
+    context_object_name = "leads"
 
-    def get_query(self):
+    def get_queryset(self):
         user = self.request.user
-
-        # init queryset of leads for whole org
-        if user.is_organizer:
-            query_set = Lead.objects.filter(
-                organization=user.userprofile,
+        # initial queryset of leads for the entire organisation
+        if user.is_organisor:
+            queryset = Lead.objects.filter(
+                organisation=user.userprofile, 
                 agent__isnull=False
             )
         else:
             queryset = Lead.objects.filter(
-                organization=user.agent.organization,
+                organisation=user.agent.organisation, 
                 agent__isnull=False
             )
-            # filter each agent logged in
+            # filter for the agent that is logged in
             queryset = queryset.filter(agent__user=user)
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super(LeadListView, self).get_context_data(**kwargs)
         user = self.request.user
-        if user.is_organizer:
+        if user.is_organisor:
             queryset = Lead.objects.filter(
-                organization=user.userprofile, 
+                organisation=user.userprofile, 
                 agent__isnull=True
             )
             context.update({
@@ -117,48 +117,49 @@ class LeadListView(LoginRequiredMixin, generic.ListView):
             })
         return context
 
-def list_of_lead(request):
+
+def lead_list(request):
     leads = Lead.objects.all()
     context = {
         "leads": leads
     }
     return render(request, "leads/lead_list.html", context)
 
-# detail of view of list
-class LeadDetailView(LoginRequiredMixin, generic.DetailView):
-    template_name = 'leads/lead_detail.html'
-    context_object_name = 'lead'
 
-    def def get_queryset(self):
-        user = self.request.user 
-        # init qeueryset of leads for entire org
-        if user.is_organizer:
-            queryset = Lead.objects.filter(organization=user.userprofile)
+class LeadDetailView(LoginRequiredMixin, generic.DetailView):
+    template_name = "leads/lead_detail.html"
+    context_object_name = "lead"
+
+    def get_queryset(self):
+        user = self.request.user
+        # initial queryset of leads for the entire organisation
+        if user.is_organisor:
+            queryset = Lead.objects.filter(organisation=user.userprofile)
         else:
-            queryset = Lead.objects.filter(organization=user.agent.organization)
-            # filter for loged in agent
+            queryset = Lead.objects.filter(organisation=user.agent.organisation)
+            # filter for the agent that is logged in
             queryset = queryset.filter(agent__user=user)
         return queryset
-    
+
 
 def lead_detail(request, pk):
     lead = Lead.objects.get(id=pk)
     context = {
-        "lead": lead 
+        "lead": lead
     }
-    return render(request, 'leads/lead_detail.html', context)
+    return render(request, "leads/lead_detail.html", context)
 
-# create new lead
+
 class LeadCreateView(OrganisorAndLoginRequiredMixin, generic.CreateView):
-    template_name = 'leads/create_lead.html'
+    template_name = "leads/lead_create.html"
     form_class = LeadModelForm
 
     def get_success_url(self):
-        return reverse('leads:leads-list')
+        return reverse("leads:lead-list")
 
     def form_valid(self, form):
         lead = form.save(commit=False)
-        lead.organization = self.request.user.userprofile
+        lead.organisation = self.request.user.userprofile
         lead.save()
         send_mail(
             subject="A lead has been created",
@@ -166,20 +167,22 @@ class LeadCreateView(OrganisorAndLoginRequiredMixin, generic.CreateView):
             from_email="test@test.com",
             recipient_list=["test2@test.com"]
         )
-        messages.success(self.request, 'New lead created')
+        messages.success(self.request, "You have successfully created a lead")
         return super(LeadCreateView, self).form_valid(form)
+
 
 def lead_create(request):
     form = LeadModelForm()
-    if request.method == 'POST':
-        form = LeadModelForm(requst.POST)
+    if request.method == "POST":
+        form = LeadModelForm(request.POST)
         if form.is_valid():
             form.save()
-            return redirect('/leads')
+            return redirect("/leads")
     context = {
-        'form': form
+        "form": form
     }
-    return render(request, 'leads/create_lead.html', context)
+    return render(request, "leads/lead_create.html", context)
+
 
 class LeadUpdateView(OrganisorAndLoginRequiredMixin, generic.UpdateView):
     template_name = "leads/lead_update.html"
@@ -511,6 +514,3 @@ class LeadJsonView(generic.View):
         return JsonResponse({
             "qs": qs,
         })
-
-
-

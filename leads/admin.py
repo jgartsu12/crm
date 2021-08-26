@@ -3,11 +3,17 @@ from .models import User, Lead, Agent, UserProfile, Category, FollowUp
 
 # Register your models here.
 
-class LeadAdmin(admin.class NameAdmin(admin.ModelAdmin):
+
+class LeadAdmin(admin.ModelAdmin):
+    '''
+        fields = (
+
+        )
+    '''
     list_display = ['first_name', 'last_name', 'age', 'email']
     list_display_links = ['first_name']
     list_editable = ['last_name']
-    list_filter =['category']
+    list_filter = ['category']
     search_fields = ['first_name', 'last_name', 'email']
 
 admin.site.register(Category)
